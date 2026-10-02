@@ -18,6 +18,22 @@ class SpatialData:
     def __str__(self) -> str:
         return f"SpatialData(longitude_range={self.longitude_range}, latitude_range={self.latitude_range}, scale={self.scale}, width={self.width}, height={self.height})"
 
+    @staticmethod
+    def __resample2D(arr: np.ndarray, ratio: int):
+        return np.array([row[::ratio] for row in arr[::ratio]])
+
+    def downsample(self, ratio: int):
+        self.scale *= ratio
+        self.height //= ratio
+        self.width //= ratio
+
+        if self.original is self.altered:
+            self.original = SpatialData.__resample2D(self.original, ratio)
+            self.altered = self.original
+        else:
+            self.original = SpatialData.__resample2D(self.original, ratio)
+            self.altered = SpatialData.__resample2D(self.altered, ratio)
+
 def _locate_by_extension(dir_path: str|Path, extension: str) -> Path:
     extension = extension if extension.startswith(".") else "." + extension
 
@@ -51,7 +67,7 @@ def _tif_to_numpy(f: Path) -> np.ndarray:
     im = Image.open(f)
     return np.array(im)
 
-def load(path: Path|str) -> SpatialData:
+def load(path: Path|str, downsampling_ratio: int) -> SpatialData:
     metadata_path=_locate_by_extension(path, "txt")
     d = _load_colonfile(metadata_path)
 
@@ -81,4 +97,8 @@ def load(path: Path|str) -> SpatialData:
         raise RuntimeError("Metadata file does not match elevation shape")
     if sd.width != sd.original.shape[1]:
             raise RuntimeError("Metadata file does not match elevation shape")
+
+    if downsampling_ratio != 1:
+        sd.downsample(downsampling_ratio)
+
     return sd

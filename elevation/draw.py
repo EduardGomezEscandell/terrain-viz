@@ -7,33 +7,37 @@ import os
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-def draw(c: Config, sd: SpatialData, ylabel: str):
-    os.makedirs(c.out_directory, 0o700, exist_ok=True)
+class TwoPlot:
+    def __init__(self, c: Config, sd: SpatialData):
+        os.makedirs(c.out_directory, 0o700, exist_ok=True)
+        self.fig, self.axs = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(20, 10))
+        self.fig.tight_layout()
+        self.sd = sd
+        self.config = c
 
-    fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(20, 10))
-    fig.tight_layout()
+        use_kilometers = max([sd.width, sd.height]) >= 5000 / sd.scale
 
-    extent=(0.0, sd.width*sd.scale, 0.0, sd.height*sd.scale)
-    units = "m"
-    if max(extent) >= 5000:
-        extent = (
-            extent[0]//1000,extent[1]//1000,extent[2]//1000,extent[3]//1000
-        )
-        units = "km"
-   
-    ax: Axes = axs[0]
-    ax.set_title("Original")
-    pos = ax.imshow(sd.original, extent=extent)
-    ax.set_ylabel(f"({units})")
-    ax.set_xlabel(f"({units})")
-    cb = fig.colorbar(pos, ax=ax, orientation='horizontal')
-    cb.set_label("Elevation")
+        self.units = "km" if use_kilometers else "m"
 
-    ax: Axes = axs[1]
-    ax.set_title("Altered")
-    pos = ax.imshow(sd.altered, extent=extent)
-    ax.set_xlabel(f"({units})")
-    cb = fig.colorbar(pos, ax=ax, orientation='horizontal')
-    cb.set_label(ylabel)
+        scale = (1000 if use_kilometers else 1) * sd.scale
+        self.extent=(0.0, sd.width*scale, 0.0, sd.height*scale)
 
-    fig.savefig(c.out_directory / "image.png")
+    def plot_original(self):
+        ax: Axes = self.axs[0]
+        ax.set_title("Original")
+        pos = ax.imshow(self.sd.original, extent=self.extent)
+        ax.set_ylabel(f"({self.units})")
+        ax.set_xlabel(f"({self.units})")
+        cb = self.fig.colorbar(pos, ax=ax, orientation='horizontal')
+        cb.set_label("Elevation")
+
+    def plot_altered_1d(self, clabel: str):
+        ax: Axes = self.axs[1]
+        ax.set_title("Altered")
+        pos = ax.imshow(self.sd.altered, extent=self.extent)
+        ax.set_xlabel(f"({self.units})")
+        cb = self.fig.colorbar(pos, ax=ax, orientation='horizontal')
+        cb.set_label(clabel)
+
+    def commit(self):
+        self.fig.savefig(self.config.out_directory / "image.png")
