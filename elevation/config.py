@@ -1,13 +1,13 @@
-from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
-import yaml
+from pathlib import Path
+import sys
 
-from typing import Literal
+import yaml
 
 class Style(Enum):
     slope = 'slope'
-    northface = 'obaga'
+    shading = 'shading'
 
     @classmethod
     def parse(cls, s: str):
@@ -23,14 +23,22 @@ class Config:
     out_directory: Path
     style: Style
     downsample: int
+    style_args: dict
 
 def load(path: str) -> Config:
     with open(path) as f:
         raw = yaml.safe_load(f)
 
-    return Config(
-        data_directory=Path(raw["data-directory"]),
-        out_directory=Path(raw["output-directory"]),
-        style=Style.parse(raw['style']),
-        downsample=int(raw.get('downsample', 1)),
+
+    conf = Config(
+        data_directory=Path(raw.pop("data-directory")),
+        out_directory=Path(raw.pop("output-directory")),
+        downsample=int(raw.pop('downsample', 1)),
+        style=Style.parse(raw.pop('style')),
+        style_args=dict(raw.pop('style-args', {})),
     )
+
+    if len(raw) != 0:
+        print(f"WARN: unrecognized args: {[k for k in conf.style_args]}", file=sys.stderr)
+
+    return conf

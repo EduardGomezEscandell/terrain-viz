@@ -1,4 +1,6 @@
 data-directory: data/barri
 output-directory: out
-style: obaga
-downsample: 4
+downsample: 1
+style: shading
+style-args:
+  angle: 300

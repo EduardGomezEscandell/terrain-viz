@@ -30,14 +30,16 @@ class TwoPlot:
         ax.set_xlabel(f"({self.units})")
         cb = self.fig.colorbar(pos, ax=ax, orientation='horizontal')
         cb.set_label("Elevation")
+        return ax
 
-    def plot_altered_1d(self, clabel: str):
+    def plot_altered_1d(self, clabel: str, **kwargs):
         ax: Axes = self.axs[1]
         ax.set_title("Altered")
-        pos = ax.imshow(self.sd.altered, extent=self.extent)
+        pos = ax.imshow(self.sd.altered, extent=self.extent, **kwargs)
         ax.set_xlabel(f"({self.units})")
         cb = self.fig.colorbar(pos, ax=ax, orientation='horizontal')
         cb.set_label(clabel)
+        return ax
 
     def commit(self):
         self.fig.savefig(self.config.out_directory / "image.png")

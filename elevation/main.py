@@ -34,13 +34,20 @@ def truncate(a: np.ndarray, qmin = 0.01, qmax = None, check_nan = True) -> np.nd
     hi: float = np.quantile(v, 1-qmin if qmax is None else qmax)
     return np.clip(a, lo, hi)
 
+def __warn_if_remaining_sargs(conf: config.Config):
+    if conf.style_args:
+        print(f"WARN: unrecognized style args: {[k for k in conf.style_args]}", file=sys.stderr)
+
+
 def draw_slopes(conf: config.Config, sd: data.SpatialData):
+    __warn_if_remaining_sargs(conf)
+
     sd.altered = scipy.ndimage.gaussian_filter(sd.altered, 10)
     grads = np.gradient(sd.altered)
     sd.altered = np.nan_to_num(100 * np.sqrt(grads[0]**2 + grads[1]**2) / sd.scale, False, 0.0)
 
     # Get rid of outliers
-    sd.altered = np.clip(sd.altered, -100, 100)
+    sd.altered = truncate(sd.altered)
 
     p = draw.TwoPlot(conf, sd)
     p.plot_original()
@@ -48,17 +55,27 @@ def draw_slopes(conf: config.Config, sd: data.SpatialData):
     p.commit()
 
 
-def draw_northface(conf: config.Config, sd: data.SpatialData):
+def __vector_at_angle(angle: float):
+    "Angle in radians"
+    return np.array([np.cos(angle), -np.sin(angle)])
+
+def draw_shading(conf: config.Config, sd: data.SpatialData):
+    angle = conf.style_args.pop("angle", 0)
+    __warn_if_remaining_sargs(conf)
+
     sd.altered = scipy.ndimage.gaussian_filter(sd.altered, 10)
-    grads = np.gradient(sd.altered)
-    sd.altered = 100/sd.scale * np.nan_to_num(grads[0], False, 0.0)
+    grad = np.gradient(sd.altered)
+    v = __vector_at_angle(np.pi / 180 * angle)
+
+    sd.altered = grad[0]*v[0] + grad[1]*v[1]
+    sd.altered = np.nan_to_num(sd.altered, False, 0.0)
 
     # Get rid of outliers
-    sd.altered = truncate(sd.altered, 0.0, 0.5)
+    sd.altered = np.clip(180/np.pi * np.arctan2(sd.altered, sd.scale), -90, 90)
 
     p = draw.TwoPlot(conf, sd)
     p.plot_original()
-    p.plot_altered_1d("Slope %")
+    p.plot_altered_1d(f"Shading, ligh in direction {int(angle)}° from north", cmap='gray')
     p.commit()
 
 
@@ -69,8 +86,8 @@ def main() -> int|None:
     match conf.style:
         case config.Style.slope:
             return draw_slopes(conf, sd)
-        case config.Style.northface:
-            return draw_northface(conf, sd)
+        case config.Style.shading:
+            return draw_shading(conf, sd)
 
 
 
