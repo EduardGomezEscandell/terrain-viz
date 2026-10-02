@@ -1,0 +1,35 @@
+# Elevation data visualizer
+
+## How to use
+First, download data from https://visors.icgc.cat/appdownloads/. It myst be elevation data in TIF format.
+
+Unzip the download and put it in some directory, for example `data/barcelona` and unzip it.
+
+Create a config file:
+```yaml
+data-directory: data/barcelona # Where your elevation data is
+output-directory: out          # Where the outputs will go to
+downsample: 4                  # Ratio to lower resolution. Default 1.
+style: shading                 # Style of generated image, see below
+style-args:                    # Args for the style, see below
+  angle: 180
+```
+
+## Styles
+
+### Slope
+Style `slope` shades terrain based on how inclined it is (i.e. the norm of the gradient).
+
+Here is an example with 2m-resolution data around Barcelona
+![alt text](.readme/slope.png)
+
+
+### Shading
+Style `shading` colors the terrain according to the slope in a particular direction. Slopes facing towards this direction will be brighter, and slopes facing against it will be darker.
+
+The direction is expressed as an angle in style-arg `angle`. 0° is north (so shadows go south), 90° is east, and so on until 360° which is north again.
+
+Note: there is no ray-tracing, the image is shaded based exclusively on the direction the ground points towards.
+
+Here is an example with 25cm lidar data around North Barcelona lit from the north west
+![alt text](.readme/shading.png)
