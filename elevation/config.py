@@ -27,8 +27,7 @@ class Config:
 
 def load(path: str) -> Config:
     with open(path) as f:
-        raw = yaml.safe_load(f)
-
+        raw = {k: v for k,v in yaml.safe_load(f).items() if v is not None}
 
     conf = Config(
         data_directory=Path(raw.pop("data-directory")),
