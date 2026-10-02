@@ -20,8 +20,10 @@ style-args:                    # Args for the style, see below
 ### Slope
 Style `slope` shades terrain based on how inclined it is (i.e. the norm of the gradient).
 
-Here is an example with 2m-resolution data around Barcelona
+Here is an example with 2m-resolution data around Barcelona.
 ![alt text](.readme/slope.png)
+
+Blank areas are outside the source map (in this case it's just the sea).
 
 
 ### Shading

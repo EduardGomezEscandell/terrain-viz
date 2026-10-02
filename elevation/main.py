@@ -25,7 +25,7 @@ def flat_nonan(a: np.ndarray):
     v = a.flatten()
     return v[np.logical_not(np.isnan(v))]
 
-def truncate(a: np.ndarray, qmin = 0.01, qmax = None, check_nan = True) -> np.ndarray:
+def clip_outliers(a: np.ndarray, qmin = 0.01, qmax = None, check_nan = True) -> np.ndarray:
     if check_nan:
         v = flat_nonan(a)
     else:
@@ -44,10 +44,10 @@ def draw_slopes(conf: config.Config, sd: data.SpatialData):
 
     sd.altered = scipy.ndimage.gaussian_filter(sd.altered, 10)
     grads = np.gradient(sd.altered)
-    sd.altered = np.nan_to_num(100 * np.sqrt(grads[0]**2 + grads[1]**2) / sd.scale, False, 0.0)
+    sd.altered = 100 * np.sqrt(grads[0]**2 + grads[1]**2) / sd.scale
 
     # Get rid of outliers
-    sd.altered = truncate(sd.altered)
+    sd.altered = clip_outliers(sd.altered)
 
     p = draw.TwoPlot(conf, sd)
     p.plot_original()
@@ -75,7 +75,7 @@ def draw_shading(conf: config.Config, sd: data.SpatialData):
 
     p = draw.TwoPlot(conf, sd)
     p.plot_original()
-    p.plot_altered_1d(f"Shading, ligh in direction {int(angle)}° from north", cmap='gray')
+    p.plot_altered_1d(f"Shading, lit from {int(angle)}° from north", cmap='gray')
     p.commit()
 
 
