@@ -32,7 +32,7 @@ thread_local std::normal_distribution<float> jitter_dist(0.0, 0.05);
 
 struct spatial_data {
   py::buffer_info const &buff;
-  float scale;
+  float max_elevation;
   std::array<float, 3> direction;
 };
 
@@ -127,9 +127,15 @@ bool cast_single_ray(spatial_data const &sd, Loc &location) {
       return true;
     }
 
-    if (buffer_at(sd.buff, location.i, location.j) > location.pos[2]) {
-      // Ray is under terrain! Return false
+    if (location.pos[2] > sd.max_elevation) {
+      // Shortcut! We're clear
       debug_printf("Escaping z\n");
+      return true;
+    }
+
+    if (location.pos[2] < buffer_at(sd.buff, location.i, location.j)) {
+      // Ray is under terrain! Return false
+      debug_printf("Hit terrain\n");
       return false;
     }
   }
@@ -195,8 +201,12 @@ void raytrace(py::buffer input_buff, py::buffer output_buff, float scale,
   const auto az = sun_azimuth * M_PI / 180;
   const auto at = sun_altitude * M_PI / 180;
 
+  float const *const begin = static_cast<float const *>(input.ptr);
+
   const spatial_data sd{.buff = input,
-                        .scale = scale,
+                        .max_elevation =
+                            *std::max_element(std::execution::par_unseq, begin,
+                                              begin + input.size),
                         .direction = {
                             (static_cast<float>(-std::cos(at) * std::cos(az))),
                             (static_cast<float>(std::cos(at) * std::sin(az))),
