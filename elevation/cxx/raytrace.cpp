@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <execution>
+#include <limits>
 #include <pybind11/buffer_info.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
@@ -28,24 +29,31 @@ struct spatial_data {
 };
 
 struct Loc {
-  size_t i; // Pixel row
-  size_t j; // Pixel col
-  Vec pos;  // Position: x,y are relative to the center of the pixel. z is
-            // elevation.
+  ssize_t i; // Pixel row
+  ssize_t j; // Pixel col
+  Vec pos;   // Position: x,y are relative to the center of the pixel. z is
+             // elevation.
 
   void print_debug() {
-    debug_printf("Location is pixel [%lu, %lu], coords (%f, %f, %f)\n", i, j,
+    debug_printf("Location is pixel [%ld, %ld], coords (%f, %f, %f)\n", i, j,
                  pos[0], pos[1], pos[2]);
   }
 };
 
-float buffer_at(py::buffer_info const &buff, size_t i, size_t j) {
-  const auto nrows = buff.shape[0];
-  return static_cast<float *>(buff.view()->buf)[i * nrows + j];
+float buffer_at(py::buffer_info const &buff, ssize_t i, ssize_t j) {
+  const auto ncols = buff.shape[1];
+  return static_cast<float *>(buff.view()->buf)[i * ncols + j];
 }
 
-std::tuple<size_t, size_t> buffer_size(py::buffer_info const &buff) {
+std::tuple<ssize_t, ssize_t> buffer_size(py::buffer_info const &buff) {
   return std::make_tuple(buff.shape[0], buff.shape[1]);
+}
+
+float safe_divide(float num, float denom) {
+  if (denom > -1e-5 && denom < 1e-5) {
+    return std::numeric_limits<float>::max();
+  }
+  return num / denom;
 }
 
 void advance(spatial_data const &sd, Loc &location) {
@@ -57,12 +65,14 @@ void advance(spatial_data const &sd, Loc &location) {
   const float edge_x = vx_sign * 0.5;
   const float edge_y = vy_sign * 0.5;
 
-  // Tajectory is parametrized as s(t) = pos + direction*t
-  // t_h is the h parameter at which the ray hits the vertical edge of the pixel
-  // t_y is the h parameter at which the ray hits the horizontal edge of the
-  // pixel We take the minimum, as that is where the ray exits the pixel
-  const float t_x = (edge_x - location.pos[0]) / sd.direction[0];
-  const float t_y = (edge_y - location.pos[1]) / sd.direction[1];
+  // Tajectory is parametrized as s(t) = pos + direction*t.
+  //  - t_h is the h parameter at which the ray hits the vertical edge of the
+  //  pixel.
+  //  - t_y is the h parameter at which the ray hits the horizontal edge of the
+  //  pixel.
+  // We take the minimum, as that is where the ray exits the pixel
+  const float t_x = safe_divide(edge_x - location.pos[0], sd.direction[0]);
+  const float t_y = safe_divide(edge_y - location.pos[1], sd.direction[1]);
 
   if (t_x < t_y) {
     // We move to the pixel to the right/left
@@ -90,7 +100,9 @@ void advance(spatial_data const &sd, Loc &location) {
 bool cast_single_ray(spatial_data const &sd, Loc &location) {
   const auto [nrows, ncols] = buffer_size(sd.buff);
 
-  for (size_t i = 0; i < nrows + ncols + 1; ++i) {
+  location.print_debug();
+
+  for (ssize_t i = 0; i < nrows + ncols + 1; ++i) {
     advance(sd, location);
 
     location.print_debug();
@@ -117,7 +129,7 @@ bool cast_single_ray(spatial_data const &sd, Loc &location) {
   throw std::runtime_error("Raytrace not converging!");
 }
 
-Loc ray_start(py::buffer_info const &buff, size_t i, size_t j,
+Loc ray_start(py::buffer_info const &buff, ssize_t i, ssize_t j,
               float eye_level) {
   return Loc{.i = i,
              .j = j,
@@ -152,17 +164,21 @@ void raytrace(py::buffer input_buff, py::buffer output_buff, float scale,
   const spatial_data sd{.buff = input,
                         .scale = scale,
                         .direction = {
-                            (static_cast<float>(std::cos(at) * std::cos(az))),
+                            (static_cast<float>(-std::cos(at) * std::cos(az))),
                             (static_cast<float>(std::cos(at) * std::sin(az))),
                             (static_cast<float>(std::sin(at))) * scale,
                         }};
 
-  auto iota = std::ranges::iota_view{size_t{0}, (size_t)input.size};
+  debug_printf("Ray direction is (%f,%f,%f)", sd.direction[0], sd.direction[1],
+               sd.direction[2]);
+
+  auto iota = std::ranges::iota_view{ssize_t{0}, input.size};
   std::transform(std::execution::par_unseq, iota.begin(), iota.end(),
-                 static_cast<float *>(output.ptr), [&](size_t px) -> float {
-                   const auto i = px / inrows;
-                   const auto j = px % inrows;
-                   auto location = ray_start(sd.buff, 100, 100, eye_level);
+                 static_cast<float *>(output.ptr), [&](ssize_t px) -> float {
+                   debug_printf("\n------------------\n");
+                   const ssize_t i = px / incols;
+                   const ssize_t j = px % incols;
+                   auto location = ray_start(sd.buff, i, j, eye_level);
                    const bool lit = cast_single_ray(sd, location);
                    return lit ? 1 : 0;
                  });
