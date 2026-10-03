@@ -5,6 +5,9 @@ from pathlib import Path
 from PIL import Image
 import numpy as np
 
+ElevationFloat = np.float32
+ElevationBuffer = np.ndarray[tuple[int, int], np.dtype[ElevationFloat]]
+
 @dataclass
 class SpatialData:
     longitude_range: tuple[float, float]
@@ -12,15 +15,15 @@ class SpatialData:
     scale: float
     width: int
     height: int
-    original: np.ndarray
-    altered: np.ndarray
+    original: ElevationBuffer
+    altered: ElevationBuffer
 
     def __str__(self) -> str:
         return f"SpatialData(longitude_range={self.longitude_range}, latitude_range={self.latitude_range}, scale={self.scale}, width={self.width}, height={self.height})"
 
     @staticmethod
-    def __resample2D(arr: np.ndarray, ratio: int):
-        return np.array([row[::ratio] for row in arr[::ratio]])
+    def __resample2D(arr: ElevationBuffer, ratio: int) -> ElevationBuffer:
+        return np.array([row[::ratio] for row in arr[::ratio]], dtype=ElevationFloat)
 
     def downsample(self, ratio: int):
         self.scale *= ratio
@@ -63,9 +66,9 @@ def _load_colonfile(path: Path|str) -> dict[str, str]:
             data[k.rstrip()] = v.lstrip()
     return data
 
-def _tif_to_numpy(f: Path) -> np.ndarray:
+def _tif_to_numpy(f: Path) -> ElevationBuffer:
     im = Image.open(f)
-    return np.array(im)
+    return np.array(im, dtype=ElevationFloat)
 
 def load(path: Path|str, downsampling_ratio: int) -> SpatialData:
     metadata_path=_locate_by_extension(path, "txt")
@@ -96,7 +99,7 @@ def load(path: Path|str, downsampling_ratio: int) -> SpatialData:
     if sd.height != sd.original.shape[0]:
         raise RuntimeError("Metadata file does not match elevation shape")
     if sd.width != sd.original.shape[1]:
-            raise RuntimeError("Metadata file does not match elevation shape")
+        raise RuntimeError("Metadata file does not match elevation shape")
 
     if downsampling_ratio != 1:
         sd.downsample(downsampling_ratio)

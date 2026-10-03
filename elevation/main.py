@@ -71,7 +71,7 @@ def draw_shading(conf: config.Config, sd: data.SpatialData):
     sd.altered = np.nan_to_num(sd.altered, False, 0.0)
 
     # Get rid of outliers
-    sd.altered = np.clip(180/np.pi * np.arctan2(sd.altered, sd.scale), -90, 90)
+    sd.altered = np.clip(180/np.pi * np.arctan2(sd.altered, sd.scale), -90, 90, dtype=data.ElevationFloat)
 
     p = draw.TwoPlot(conf, sd)
     p.plot_original()
@@ -81,10 +81,17 @@ def draw_shading(conf: config.Config, sd: data.SpatialData):
 
 def draw_sunshine(conf: config.Config, sd: data.SpatialData):
     sun_azimuth = float(conf.style_args.pop("sun-azimuth", 0.0))
-    sun_altitude = float(conf.style_args.pop("sun-altitude", 0.0))
+    sun_altitude = float(conf.style_args.pop("sun-altitude", 45.0))
+    eye_level = float(conf.style_args.pop("eye-level", 1.7))
     __warn_if_remaining_sargs(conf)
 
-    raytrace.raytrace(sd.altered, sd.scale, sun_altitude, sun_azimuth)
+    sd.altered = -9999*np.zeros_like(sd.original)
+    raytrace.raytrace(sd.original, sd.altered, sd.scale, sun_azimuth, sun_altitude, eye_level)
+
+    p = draw.TwoPlot(conf, sd)
+    p.plot_original()
+    p.plot_altered_1d(f"Shadows. Azimouth: {int(sun_azimuth)}°, altitude: {int(sun_altitude)}°, eye level: {eye_level:.2f}", cmap='gray')
+    p.commit()
 
 def main() -> int|None:
     conf = parse_args()

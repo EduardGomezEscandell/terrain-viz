@@ -20,9 +20,11 @@ dependencies: install-apt-dependencies install-uv install-python-dependencies
 
 .PHONY: clear
 clear:
-	rm -rf .venv              || true
-	rm -rf elevation.egg-info || true
-	rm -rf out                || true
+	rm -rf .venv                 || true
+	rm -rf elevation.egg-info    || true
+	rm -rf out                   || true
+	rm -rf build                 || true
+	rm -rf compile_commands.json || true
 
 .PHONY: run
 run:
