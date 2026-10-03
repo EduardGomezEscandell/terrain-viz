@@ -17,7 +17,7 @@ class TwoPlot:
         figs[0], axs[0] = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(20, 10))
         figs[0].tight_layout()
 
-        aspect_ratio = sd.original.shape[1]/sd.original.shape[0]
+        aspect_ratio = sd.original.shape[0]/sd.original.shape[1]
         figs[1], axs[1] = plt.subplots(nrows=1, ncols=1, figsize=(10,10*aspect_ratio))
 
         self.figs: list[Figure] = [f for f in figs if isinstance(f, Figure)]
@@ -27,7 +27,7 @@ class TwoPlot:
         self.config = c
 
         use_kilometers = max([sd.width, sd.height]) >= 5000 / sd.scale
-        scale = (1000 if use_kilometers else 1) * sd.scale
+        scale = (0.001 if use_kilometers else 1) * sd.scale
         self.units = "km" if use_kilometers else "m"
         self.extent=(0.0, sd.width*scale, 0.0, sd.height*scale)
 
