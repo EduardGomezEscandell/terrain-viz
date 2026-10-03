@@ -63,7 +63,6 @@ def draw_shading(conf: config.Config, sd: data.SpatialData):
     angle = conf.style_args.pop("angle", 0)
     __warn_if_remaining_sargs(conf)
 
-    sd.altered = scipy.ndimage.gaussian_filter(sd.altered, 10)
     grad = np.gradient(sd.altered)
     v = __vector_at_angle(np.pi / 180 * angle)
 
