@@ -7,8 +7,9 @@
 #include <pybind11/buffer_info.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
-#include <ranges>
 #include <stdexcept>
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
 
 // #define DEBUG_PRINTS 1
 
@@ -172,12 +173,13 @@ void raytrace(py::buffer input_buff, py::buffer output_buff, float scale,
   debug_printf("Ray direction is (%f,%f,%f)", sd.direction[0], sd.direction[1],
                sd.direction[2]);
 
-  auto iota = std::ranges::iota_view{ssize_t{0}, input.size};
-  std::transform(std::execution::par_unseq, iota.begin(), iota.end(),
-                 static_cast<float *>(output.ptr), [&](ssize_t px) -> float {
+  auto out_begin = static_cast<float *>(output.ptr);
+  std::transform(std::execution::par_unseq, out_begin, out_begin + input.size,
+                 out_begin, [&](float& cursor) -> float {
                    debug_printf("\n------------------\n");
-                   const ssize_t i = px / incols;
-                   const ssize_t j = px % incols;
+                   const ssize_t flat_index = &cursor - out_begin;
+                   const ssize_t i = flat_index / incols;
+                   const ssize_t j = flat_index % incols;
                    auto location = ray_start(sd.buff, i, j, eye_level);
                    const bool lit = cast_single_ray(sd, location);
                    return lit ? 1 : 0;
