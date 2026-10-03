@@ -79,16 +79,21 @@ def draw_shading(conf: config.Config, sd: data.SpatialData):
     p.commit()
 
 
+def draw_sunshine(conf: config.Config, sd: data.SpatialData):
+    sun_azimuth = float(conf.style_args.pop("sun-azimuth", 0.0))
+    sun_altitude = float(conf.style_args.pop("sun-altitude", 0.0))
+    __warn_if_remaining_sargs(conf)
+
+    raytrace.raytrace(sd.altered, sd.scale, sun_altitude, sun_azimuth)
+
 def main() -> int|None:
-    # conf = parse_args()
-    # sd = data.load(conf.data_directory, conf.downsample)
+    conf = parse_args()
+    sd = data.load(conf.data_directory, conf.downsample)
 
-    # match conf.style:
-    #     case config.Style.slope:
-    #         return draw_slopes(conf, sd)
-    #     case config.Style.shading:
-    #         return draw_shading(conf, sd)
-
-    print(raytrace.add(1, 2))
-
-
+    match conf.style:
+        case config.Style.slope:
+            return draw_slopes(conf, sd)
+        case config.Style.shading:
+            return draw_shading(conf, sd)
+        case config.Style.sunshine:
+            return draw_sunshine(conf, sd)

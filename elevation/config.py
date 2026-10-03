@@ -8,6 +8,7 @@ import yaml
 class Style(Enum):
     slope = 'slope'
     shading = 'shading'
+    sunshine = 'sunshine'
 
     @classmethod
     def parse(cls, s: str):

@@ -48,3 +48,6 @@ Note: there is no ray-tracing, the image is shaded based exclusively on the dire
 
 Here is an example with 25cm lidar data around North Barcelona lit from the north west
 ![alt text](.readme/shading.png)
+
+### Sunshine
+Style `sunshine` uses ray tracing with two float style arguments: `sun-azimuth` gives the sun's direction in degrees clockwise from north, while `sun-altitude` gives its angle in degrees above the horizon. Both default to `0.0`.
