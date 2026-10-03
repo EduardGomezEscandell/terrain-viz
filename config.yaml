@@ -1,7 +1,7 @@
-data-directory: data/barcelona
+data-directory: data/barri
 output-directory: out
-downsample: 4
+downsample: 16
 style: sunshine
 style-args:
-  sun-azimuth: 300
-  sun-altitude: 80
+  sun-azimuth: 270
+  sun-altitude: 10
