@@ -9,6 +9,7 @@ class Style(Enum):
     slope = 'slope'
     shading = 'shading'
     sunshine = 'sunshine'
+    sunset_animation = 'sunset-animation'
 
     @classmethod
     def parse(cls, s: str):

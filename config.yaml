@@ -1,7 +1,11 @@
-data-directory: data/barri
+data-directory: data/barcelona
 output-directory: out
-downsample: 16
-style: sunshine
+downsample: 4
+style: sunset-animation
 style-args:
-  sun-azimuth: 270
-  sun-altitude: 10
+  sun-azimuth: 180
+  sun-altitude: 45
+  sun-azimuth-end: 270
+  sun-altitude-end: 5
+  frames: 120
+  duration: 5

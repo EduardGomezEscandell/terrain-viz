@@ -6,6 +6,7 @@ import elevation.raytrace as raytrace
 
 import numpy as np
 import scipy.ndimage
+from PIL import Image
 
 def parse_args() -> config.Config:
     match sys.argv:
@@ -83,6 +84,7 @@ def draw_sunshine(conf: config.Config, sd: data.SpatialData):
     sun_azimuth = float(conf.style_args.pop("sun-azimuth", 0.0))
     sun_altitude = float(conf.style_args.pop("sun-altitude", 45.0))
     eye_level = float(conf.style_args.pop("eye-level", 1.7))
+
     __warn_if_remaining_sargs(conf)
 
     sd.altered = -9999*np.zeros_like(sd.original)
@@ -92,6 +94,59 @@ def draw_sunshine(conf: config.Config, sd: data.SpatialData):
     p.plot_original()
     p.plot_altered_1d(f"Shadows. Azimouth: {int(sun_azimuth)}°, altitude: {int(sun_altitude)}°, eye level: {eye_level:.2f}", cmap='gray')
     p.commit()
+
+
+def draw_sunset_animation(conf: config.Config, sd: data.SpatialData):
+    sun_azimuth = float(conf.style_args.pop("sun-azimuth", 0.0))
+    sun_altitude = float(conf.style_args.pop("sun-altitude", 45.0))
+    end_azimuth = float(conf.style_args.pop("sun-azimuth-end"))
+    end_altitude = float(conf.style_args.pop("sun-altitude-end"))
+    eye_level = float(conf.style_args.pop("eye-level", 1.7))
+    frame_count_value = float(conf.style_args.pop("frames"))
+    if not frame_count_value.is_integer():
+        raise ValueError("frames must be a positive integer")
+    frame_count = int(frame_count_value)
+    duration_seconds = float(conf.style_args.pop("duration", 4.0))
+    __warn_if_remaining_sargs(conf)
+
+    if frame_count <= 0:
+        raise ValueError("frames must be a positive integer")
+
+    duration_centiseconds = round(duration_seconds * 100)
+    if duration_seconds <= 0 or not np.isclose(duration_seconds * 100, duration_centiseconds, rtol=0, atol=1e-9):
+        raise ValueError("duration must be a positive multiple of 0.01 seconds")
+    if duration_centiseconds < frame_count:
+        raise ValueError("duration must allow at least 0.01 seconds per frame")
+
+    delays_centiseconds = [
+        (i + 1) * duration_centiseconds // frame_count
+        - i * duration_centiseconds // frame_count
+        for i in range(frame_count)
+    ]
+    azimuths = np.linspace(sun_azimuth, end_azimuth, frame_count)
+    altitudes = np.linspace(sun_altitude, end_altitude, frame_count)
+    rendered_frames = []
+
+    print(f"Rendering {frame_count} sunset frames...")
+    for azimuth, altitude in zip(azimuths, altitudes):
+        sd.altered = np.zeros_like(sd.original)
+        raytrace.raytrace(sd.original, sd.altered, sd.scale, azimuth, altitude, eye_level)
+        frame = np.where(sd.altered > 0.5, 255, 0).astype(np.uint8)
+        rendered_frames.append(Image.fromarray(frame))
+
+    output_path = conf.out_directory / "sunset.gif"
+    conf.out_directory.mkdir(parents=True, exist_ok=True)
+    rendered_frames[0].save(
+        output_path,
+        save_all=True,
+        append_images=rendered_frames[1:],
+        duration=[delay * 10 for delay in delays_centiseconds],
+        loop=0,
+        disposal=2,
+        optimize=False,
+    )
+    print(f"Saved sunset animation to {output_path}")
+
 
 def main() -> int|None:
     conf = parse_args()
@@ -104,3 +159,5 @@ def main() -> int|None:
             return draw_shading(conf, sd)
         case config.Style.sunshine:
             return draw_sunshine(conf, sd)
+        case config.Style.sunset_animation:
+            return draw_sunset_animation(conf, sd)

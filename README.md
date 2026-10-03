@@ -51,3 +51,16 @@ Here is an example with 25cm lidar data around North Barcelona lit from the nort
 
 ### Sunshine
 Style `sunshine` uses ray tracing with two float style arguments: `sun-azimuth` gives the sun's direction in degrees clockwise from north, while `sun-altitude` gives its angle in degrees above the horizon. Both default to `0.0`.
+
+Style `sunset-animation` renders a looping sunset GIF. The azimuth and altitude specify the starting sun position, and `sun-azimuth-end` and `sun-altitude-end` specify the ending position. `frames` sets the frame count and `duration` sets the total duration in seconds. For example:
+```yaml
+style: sunset-animation
+style-args:
+  sun-azimuth: 250
+  sun-altitude: 60
+  sun-azimuth-end: 270
+  sun-altitude-end: 0
+  frames: 96
+  duration: 4
+```
+Run the usual command to save the animation as `sunset.gif` in the output directory. GIF frame timing uses hundredths of a second, so the total duration must be a positive multiple of 0.01 seconds and allow at least 0.01 seconds per frame.
