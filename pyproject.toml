@@ -10,7 +10,7 @@ dependencies = [
     "numpy>=2.5.3",
     "pillow>=12.3.0",
     "matplotlib>=3.11.2",
-    "scipy>=1.18.1"
+    "scipy>=1.18.1",
 ]
 
 [project.scripts]
@@ -20,5 +20,5 @@ display = "elevation.__main__:main"
 packages = ["elevation"]
 
 [build-system]
-build-backend = 'setuptools.build_meta'
-requires = ['setuptools']
+requires = ['setuptools', "scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"

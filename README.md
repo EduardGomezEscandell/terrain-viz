@@ -1,5 +1,14 @@
 # Elevation data visualizer
 
+## Getting started
+
+Get your environment ready by running:
+```sh
+make dependencies
+make build
+```
+
+
 ## How to use
 First, download data from https://visors.icgc.cat/appdownloads/. It myst be elevation data in TIF format.
 
@@ -13,6 +22,11 @@ downsample: 4                  # Ratio to lower resolution. Default 1.
 style: shading                 # Style of generated image, see below
 style-args:                    # Args for the style, see below
   angle: 180
+```
+
+Then run it with: 
+```sh
+make run
 ```
 
 ## Styles

@@ -2,6 +2,7 @@ import sys
 import elevation.config as config
 import elevation.data as data
 import elevation.draw as draw
+import elevation.raytrace as raytrace
 
 import numpy as np
 import scipy.ndimage
@@ -79,14 +80,15 @@ def draw_shading(conf: config.Config, sd: data.SpatialData):
 
 
 def main() -> int|None:
-    conf = parse_args()
-    sd = data.load(conf.data_directory, conf.downsample)
+    # conf = parse_args()
+    # sd = data.load(conf.data_directory, conf.downsample)
 
-    match conf.style:
-        case config.Style.slope:
-            return draw_slopes(conf, sd)
-        case config.Style.shading:
-            return draw_shading(conf, sd)
+    # match conf.style:
+    #     case config.Style.slope:
+    #         return draw_slopes(conf, sd)
+    #     case config.Style.shading:
+    #         return draw_shading(conf, sd)
 
+    print(raytrace.add(1, 2))
 
 
