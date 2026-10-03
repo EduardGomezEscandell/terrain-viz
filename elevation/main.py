@@ -128,11 +128,23 @@ def draw_sunset_animation(conf: config.Config, sd: data.SpatialData):
     rendered_frames = []
 
     print(f"Rendering {frame_count} sunset frames...")
-    for azimuth, altitude in zip(azimuths, altitudes):
+    progress_width = 30
+    for frame_index, (azimuth, altitude) in enumerate(
+        zip(azimuths, altitudes), start=1
+    ):
         sd.altered = np.zeros_like(sd.original)
         raytrace.raytrace(sd.original, sd.altered, sd.scale, azimuth, altitude, eye_level)
         frame = np.where(sd.altered > 0.5, 255, 0).astype(np.uint8)
         rendered_frames.append(Image.fromarray(frame))
+
+        completed_width = progress_width * frame_index // frame_count
+        progress_bar = "=" * completed_width + " " * (progress_width - completed_width)
+        print(
+            f"\r[{progress_bar}] {frame_index}/{frame_count} frames",
+            end="",
+            flush=True,
+        )
+    print()
 
     output_path = conf.out_directory / "sunset.gif"
     conf.out_directory.mkdir(parents=True, exist_ok=True)
