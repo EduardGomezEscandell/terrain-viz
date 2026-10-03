@@ -19,6 +19,15 @@ display = "elevation.__main__:main"
 [tool.setuptools]
 packages = ["elevation"]
 
+[tool.scikit-build]
+build-dir = "build"
+
+[tool.uv]
+no-build-isolation-package = ["elevation"]
+
+[dependency-groups]
+dev = ["pybind11", "scikit-build-core", "setuptools"]
+
 [build-system]
 requires = ['setuptools', "scikit-build-core", "pybind11"]
 build-backend = "scikit_build_core.build"

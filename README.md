@@ -5,9 +5,8 @@
 Get your environment ready by running:
 ```sh
 make dependencies
-make build
 ```
-
+This will download dependencies and build the binaries.
 
 ## How to use
 First, download data from https://visors.icgc.cat/appdownloads/. It myst be elevation data in TIF format.

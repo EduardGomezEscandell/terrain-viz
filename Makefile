@@ -13,6 +13,7 @@ install-uv:
 .PHONY: install-python-dependencies
 install-python-dependencies:
 	uv sync --reinstall-package elevation
+	[ -f compile_commands.json ] || ln -s build/compile_commands.json compile_commands.json
 
 .PHONY: dependencies
 dependencies: install-apt-dependencies install-uv install-python-dependencies
