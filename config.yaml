@@ -9,3 +9,4 @@ style-args:
   sun-altitude-end: 5
   frames: 120
   duration: 5
+  subsampling-level: 2

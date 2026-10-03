@@ -40,6 +40,12 @@ def __warn_if_remaining_sargs(conf: config.Config):
     if conf.style_args:
         print(f"WARN: unrecognized style args: {[k for k in conf.style_args]}", file=sys.stderr)
 
+def __subsampling_level(conf: config.Config) -> int:
+    value = float(conf.style_args.pop("subsampling-level", 0))
+    if not value.is_integer() or not 0 <= value <= 2:
+        raise ValueError("subsampling-level must be 0, 1, or 2")
+    return int(value)
+
 
 def draw_slopes(conf: config.Config, sd: data.SpatialData):
     __warn_if_remaining_sargs(conf)
@@ -84,11 +90,12 @@ def draw_sunshine(conf: config.Config, sd: data.SpatialData):
     sun_azimuth = float(conf.style_args.pop("sun-azimuth", 0.0))
     sun_altitude = float(conf.style_args.pop("sun-altitude", 45.0))
     eye_level = float(conf.style_args.pop("eye-level", 1.7))
+    subsampling_level = __subsampling_level(conf)
 
     __warn_if_remaining_sargs(conf)
 
     sd.altered = -9999*np.zeros_like(sd.original)
-    raytrace.raytrace(sd.original, sd.altered, sd.scale, sun_azimuth, sun_altitude, eye_level)
+    raytrace.raytrace(sd.original, sd.altered, sd.scale, sun_azimuth, sun_altitude, eye_level, subsampling_level)
 
     p = draw.TwoPlot(conf, sd)
     p.plot_original()
@@ -102,6 +109,7 @@ def draw_sunset_animation(conf: config.Config, sd: data.SpatialData):
     end_azimuth = float(conf.style_args.pop("sun-azimuth-end"))
     end_altitude = float(conf.style_args.pop("sun-altitude-end"))
     eye_level = float(conf.style_args.pop("eye-level", 1.7))
+    subsampling_level = __subsampling_level(conf)
     frame_count_value = float(conf.style_args.pop("frames"))
     if not frame_count_value.is_integer():
         raise ValueError("frames must be a positive integer")
@@ -133,8 +141,8 @@ def draw_sunset_animation(conf: config.Config, sd: data.SpatialData):
         zip(azimuths, altitudes), start=1
     ):
         sd.altered = np.zeros_like(sd.original)
-        raytrace.raytrace(sd.original, sd.altered, sd.scale, azimuth, altitude, eye_level)
-        frame = np.where(sd.altered > 0.5, 255, 0).astype(np.uint8)
+        raytrace.raytrace(sd.original, sd.altered, sd.scale, azimuth, altitude, eye_level, subsampling_level)
+        frame = np.rint(sd.altered * 255).astype(np.uint8)
         rendered_frames.append(Image.fromarray(frame))
 
         completed_width = progress_width * frame_index // frame_count

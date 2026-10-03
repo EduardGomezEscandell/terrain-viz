@@ -49,8 +49,9 @@ Note: there is no ray-tracing, the image is shaded based exclusively on the dire
 Here is an example with 25cm lidar data around North Barcelona lit from the north west
 ![alt text](.readme/shading.png)
 
-### Sunshine
+### Sunshine and sunset-animation
 Style `sunshine` uses ray tracing with two float style arguments: `sun-azimuth` gives the sun's direction in degrees clockwise from north, while `sun-altitude` gives its angle in degrees above the horizon. Both default to `0.0`.
+Both `sunshine` and `sunset-animation` accept `subsampling-level`: `0` casts one ray from each pixel center; `1` casts four offset rays per pixel; and `2` uses the same four-ray pattern with each ray's position randomly jiggled. The jitter is drawn from a normal distribution with a standard deviation of 0.05 pixels and clamped to stay within the pixel. It is deterministic per pixel, so repeated renders use the same sample positions. Levels `1` and `2` average the rays' visibility for smoother shadow edges. The default is `0`.
 
 Style `sunset-animation` renders a looping sunset GIF. The azimuth and altitude specify the starting sun position, and `sun-azimuth-end` and `sun-altitude-end` specify the ending position. `frames` sets the frame count and `duration` sets the total duration in seconds. For example:
 ```yaml
@@ -62,5 +63,9 @@ style-args:
   sun-altitude-end: 0
   frames: 96
   duration: 4
+  subsampling-level: 1
 ```
 Run the usual command to save the animation as `sunset.gif` in the output directory. GIF frame timing uses hundredths of a second, so the total duration must be a positive multiple of 0.01 seconds and allow at least 0.01 seconds per frame.
+
+Example sunset animation over Montserrat:
+![Sunset animation over Montserrat](.readme/montserrat.gif)

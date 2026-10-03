@@ -1,12 +1,15 @@
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <execution>
 #include <limits>
+#include <numeric>
 #include <pybind11/buffer_info.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
+#include <random>
 #include <stdexcept>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -22,6 +25,10 @@ void nothing(char const *, ...) {};
 
 namespace py = pybind11;
 using Vec = std::array<float, 3>;
+
+// Consistent seed so that creating animations does not produce noise
+thread_local std::mt19937 jitter_generator(123456);
+thread_local std::normal_distribution<float> jitter_dist(0.0, 0.05);
 
 struct spatial_data {
   py::buffer_info const &buff;
@@ -130,19 +137,45 @@ bool cast_single_ray(spatial_data const &sd, Loc &location) {
   throw std::runtime_error("Raytrace not converging!");
 }
 
-Loc ray_start(py::buffer_info const &buff, ssize_t i, ssize_t j,
-              float eye_level) {
-  return Loc{.i = i,
-             .j = j,
-             .pos = {
-                 0.0,
-                 0.0,
-                 buffer_at(buff, i, j) + eye_level,
-             }};
+std::vector<Loc> ray_start(py::buffer_info const &buff, ssize_t i, ssize_t j,
+                           float eye_level, uint subsampling_level) {
+  const float z = buffer_at(buff, i, j) + eye_level;
+
+  switch (subsampling_level) {
+  case 0: // Central
+    return {Loc{i, j, {-0.0, -0.0, z}}};
+  case 1: // Rombus
+    return {Loc{i, j, {0.00, -0.33, z}}, Loc{i, j, {0.00, 0.33, z}},
+            Loc{i, j, {-0.33, 0.00, z}}, Loc{i, j, {0.33, 0.00, z}}};
+  case 2: // Rhombus, jiggled
+  {
+    std::vector L = {Loc{i, j, {0.00, -0.33, z}}, Loc{i, j, {0.00, 0.33, z}},
+                     Loc{i, j, {-0.33, 0.00, z}}, Loc{i, j, {0.33, 0.00, z}}};
+
+    // Reset the seed so that re-running the same image yields the same
+    // subpixels
+    jitter_generator.seed(i * buff.shape[1] + j);
+    jitter_dist.reset();
+
+    for (auto &loc : L) {
+      loc.pos[0] =
+          std::clamp(loc.pos[0] + jitter_dist(jitter_generator), -0.45f, 0.45f);
+      loc.pos[1] =
+          std::clamp(loc.pos[1] + jitter_dist(jitter_generator), -0.45f, 0.45f);
+    }
+
+    return L;
+  }
+  case 3:
+
+  default:
+    throw std::runtime_error("Chosen Subsampling level does not exist");
+  }
 }
 
 void raytrace(py::buffer input_buff, py::buffer output_buff, float scale,
-              float sun_azimuth, float sun_altitude, float eye_level) {
+              float sun_azimuth, float sun_altitude, float eye_level,
+              uint subsampling_level) {
   const auto input = input_buff.request();
   const auto output = output_buff.request(true);
 
@@ -174,14 +207,22 @@ void raytrace(py::buffer input_buff, py::buffer output_buff, float scale,
                sd.direction[2]);
 
   auto out_begin = static_cast<float *>(output.ptr);
-  std::transform(std::execution::par_unseq, out_begin, out_begin + input.size,
-                 out_begin, [&](float& cursor) -> float {
-                   debug_printf("\n------------------\n");
-                   const ssize_t flat_index = &cursor - out_begin;
-                   const ssize_t i = flat_index / incols;
-                   const ssize_t j = flat_index % incols;
-                   auto location = ray_start(sd.buff, i, j, eye_level);
-                   const bool lit = cast_single_ray(sd, location);
-                   return lit ? 1 : 0;
-                 });
+  std::transform(
+      std::execution::par_unseq, out_begin, out_begin + input.size, out_begin,
+      [&](float &cursor) -> float {
+        debug_printf("\n------------------\n");
+        const ssize_t flat_index = &cursor - out_begin;
+        const ssize_t i = flat_index / incols;
+        const ssize_t j = flat_index % incols;
+
+        auto subpixels = ray_start(sd.buff, i, j, eye_level, subsampling_level);
+
+        const int lit_subpixels = std::transform_reduce(
+            std::execution::unseq, subpixels.cbegin(), subpixels.cend(), 0,
+            std::plus<int>{}, [&](Loc location) {
+              return cast_single_ray(sd, location) ? 1 : 0;
+            });
+
+        return static_cast<float>(lit_subpixels) / subpixels.size();
+      });
 }
