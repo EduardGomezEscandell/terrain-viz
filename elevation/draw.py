@@ -4,6 +4,7 @@ import numpy as np
 
 import os
 
+import matplotlib.colors
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -31,10 +32,26 @@ class TwoPlot:
         self.units = "km" if use_kilometers else "m"
         self.extent=(0.0, sd.width*scale, 0.0, sd.height*scale)
 
-    def plot_original(self):
+    def plot_original(self, **kwargs):
         ax = self.axes[0][0]
         ax.set_title("Original")
-        pos = ax.imshow(self.sd.original, extent=self.extent)
+
+        class ZeroIsUnder(matplotlib.colors.Normalize):
+            "Cheap trick to paint the sea blue"
+            def __call__(self, value, clip=None):
+                normalized = super().__call__(value, clip)
+                return np.ma.where(np.ma.asarray(value) == 0.0, -1.0, normalized)
+
+        cmap = plt.get_cmap(kwargs.get("cmap", "summer")).copy()
+        cmap.set_bad("lightgray")  # no data
+        cmap.set_under("blue")     # The sea
+        pos = ax.imshow(
+            self.sd.original,
+            extent=self.extent,
+            cmap=cmap,
+            norm=ZeroIsUnder(),
+            interpolation="nearest")
+
         ax.set_ylabel(f"({self.units})")
         ax.set_xlabel(f"({self.units})")
         cb = self.figs[0].colorbar(pos, ax=ax, orientation='horizontal')
@@ -54,3 +71,4 @@ class TwoPlot:
     def commit(self):
         for i, fig in enumerate(self.figs):
             fig.savefig(self.config.out_directory / f"image{i}.png")
+            plt.close(fig)
