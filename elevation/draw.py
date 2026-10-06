@@ -1,9 +1,12 @@
-from elevation.data import SpatialData
-from elevation.config import Config
-import numpy as np
-
+from pathlib import Path
 import os
 
+from elevation.data import SpatialData, ElevationBuffer
+from elevation.config import Config
+
+
+import numpy as np
+from PIL import Image
 import matplotlib.colors
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -72,3 +75,63 @@ class TwoPlot:
         for i, fig in enumerate(self.figs):
             fig.savefig(self.config.out_directory / f"image{i}.png")
             plt.close(fig)
+
+class GifMaker:
+    def __init__(self, frame_count: int, duration_seconds: float, output_dir: Path):
+        if duration_seconds <= 0:
+            raise ValueError("duration_seconds must be positive")
+        if frame_count <= 0:
+            raise ValueError("duration_seconds must be positive")
+
+        duration_ms = round(duration_seconds * 1000)
+        if not np.isclose(duration_seconds * 1000, duration_ms, rtol=0, atol=1e-9):
+            raise ValueError(f"duration ({duration_ms}) must be a positive multiple of 10 ms")
+        if duration_ms < frame_count:
+            raise ValueError("duration must allow at least 10 ms per frame")
+
+        self.duration_ms = duration_ms
+        self.delay_ms = np.diff(np.linspace(0, duration_ms, frame_count+1, dtype=np.int32)).tolist()
+        self.frame_count = frame_count
+        self.frames: list[Image.Image] = []
+        self.output_dir = Path(output_dir)
+        self.progress_bar_used = (False, None)
+
+    def append(self, buffer255: ElevationBuffer):
+        if len(self.frames) > self.frame_count:
+            print("[WARN] appending more frames than planned, GIF will last longer than requested")
+        frame = np.rint(buffer255).astype(np.uint8)
+        self.frames.append(Image.fromarray(frame))
+
+    def progress_bar(self, bar_width=30, file=None):
+        completed_width = bar_width * len(self.frames) // self.frame_count
+        progress_bar = "=" * completed_width + " " * (bar_width - completed_width)
+        print(
+            f"\r[{progress_bar}] {len(self.frames)}/{self.frame_count} frames",
+            end="",
+            flush=True,
+            file=file
+        )
+        self.progress_bar_used = (True, file)
+
+    def save(self) -> Path:
+        if len(self.frames) < self.frame_count:
+            print("[WARN] saving GIF with fewer frames than planned, GIF will last less than requested")
+
+        output_path = self.output_dir / "sunset.gif"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.frames[0].save(
+            output_path,
+            save_all=True,
+            append_images=self.frames[1:],
+            duration=self.delay_ms,
+            loop=0,
+            disposal=2,
+            optimize=False,
+        )
+        return output_path
+
+    def close(self):
+        self.frames = []
+        if self.progress_bar_used[0]:
+            print(file=self.progress_bar_used[1])
+            self.progress_bar_used = (None, None)

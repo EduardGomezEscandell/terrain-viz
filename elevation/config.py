@@ -8,8 +8,8 @@ import yaml
 class Style(Enum):
     slope = 'slope'
     shading = 'shading'
-    sunshine = 'sunshine'
-    sunset_animation = 'sunset-animation'
+    sunshine_static = 'sunshine-static'
+    sunshine_animation = 'sunshine-animation'
 
     @classmethod
     def parse(cls, s: str):
@@ -27,6 +27,10 @@ class Config:
     downsample: int
     style_args: dict
 
+    def warn_if_remaining_style_args(self: 'Config'):
+        if self.style_args:
+            print(f"WARN: unrecognized style args: {[k for k in self.style_args]}", file=sys.stderr)
+
 def load(path: str) -> Config:
     with open(path) as f:
         raw = {k: v for k,v in yaml.safe_load(f).items() if v is not None}
@@ -43,3 +47,4 @@ def load(path: str) -> Config:
         print(f"WARN: unrecognized args: {[k for k in conf.style_args]}", file=sys.stderr)
 
     return conf
+

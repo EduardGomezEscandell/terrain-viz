@@ -1,10 +1,10 @@
-data-directory: data/barcelona
+data-directory: data/montserrat
 output-directory: out
-downsample: 4
-style: sunset-animation
+downsample: 16
+style: sunshine-animation
 style-args:
-  sun-azimuth: 180
-  sun-altitude: 45
+  sun-azimuth-start: 180
+  sun-altitude-start: 45
   sun-azimuth-end: 270
   sun-altitude-end: 5
   frames: 120

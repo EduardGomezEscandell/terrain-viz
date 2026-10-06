@@ -50,22 +50,28 @@ Here is an example with 25cm lidar data around North Barcelona lit from the nort
 ![alt text](.readme/shading.png)
 
 ### Sunshine and sunset-animation
-Style `sunshine` uses ray tracing with two float style arguments: `sun-azimuth` gives the sun's direction in degrees clockwise from north, while `sun-altitude` gives its angle in degrees above the horizon. Both default to `0.0`.
-Both `sunshine` and `sunset-animation` accept `subsampling-level`: `0` casts one ray from each pixel center; `1` casts four offset rays per pixel; and `2` uses the same four-ray pattern with each ray's position randomly jiggled. The jitter is drawn from a normal distribution with a standard deviation of 0.05 pixels and clamped to stay within the pixel. It is deterministic per pixel, so repeated renders use the same sample positions. Levels `1` and `2` average the rays' visibility for smoother shadow edges. The default is `0`.
+Style `sunshine-static` uses ray tracing to render shadows for a fixed sun position. The `sun-azimuth` style argument gives the sun's direction in degrees clockwise from north, while `sun-altitude` gives its angle in degrees above the horizon.
 
-Style `sunset-animation` renders a looping sunset GIF. The azimuth and altitude specify the starting sun position, and `sun-azimuth-end` and `sun-altitude-end` specify the ending position. `frames` sets the frame count and `duration` sets the total duration in seconds. For example:
+Both sunshine styles accept `subsampling-level`:
+- `0` casts one ray from each pixel center (no subsampling)
+- `1` casts four offset rays per pixel
+- `2` casts four offset rays per pixel, with each ray's position randomly jiggled. Useful to avoid sudden jumps in animations.
+
+Style `sunshine-animation` creates a GIF, each frame being the same as the sunset-static render.
+
+The `sun-azimuth-start` and `sun-altitude-start` arguments specify the starting sun position, while `sun-azimuth-end` and `sun-altitude-end` specify the ending position. `frames` sets the frame count and `duration` sets the total duration in seconds. For example:
 ```yaml
 style: sunset-animation
 style-args:
-  sun-azimuth: 250
-  sun-altitude: 60
-  sun-azimuth-end: 270
-  sun-altitude-end: 0
+  sun-azimuthstart: 250
+  sun-altitudestart: 60
+  sun-azimuthend: 270
+  sun-altitudeend: 0
   frames: 96
   duration: 4
   subsampling-level: 1
 ```
-Run the usual command to save the animation as `sunset.gif` in the output directory. GIF frame timing uses hundredths of a second, so the total duration must be a positive multiple of 0.01 seconds and allow at least 0.01 seconds per frame.
+Run the usual command to save the animation as `sunset.gif` in the output directory.
 
 Example sunset animation over Montserrat:
 ![Sunset animation over Montserrat](.readme/montserrat.gif)
