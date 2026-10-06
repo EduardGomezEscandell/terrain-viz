@@ -46,7 +46,7 @@ def draw_static(conf: config.Config, sd: data.SpatialData):
     if sun_data["format"] == "angles":
         az = sun_data["azimuth"]
         alt = sun_data["altitude"]
-        raytrace.raytrace(sd.original, sd.altered, sd.scale, az, alt, eye_level, subsampling_level)
+        raytrace.raytrace_fixedsource(sd.original, sd.altered, sd.scale, az, alt, eye_level, subsampling_level)
         title = f"Shadows. Azimuth: {int(sun_data["azimuth"])}°, altitude: {int(sun_data["altitude"])}°, eye level: {eye_level:.2f}"
     else:
         raise NotImplemented("TODO")
@@ -93,7 +93,7 @@ def draw_animation(conf: config.Config, sd: data.SpatialData):
         if data_is_angles:
             az = azimuths[i]
             alt = altitudes[i]
-            raytrace.raytrace(sd.original, sd.altered, sd.scale, az, alt, eye_level, subsampling_level)
+            raytrace.raytrace_fixedsource(sd.original, sd.altered, sd.scale, az, alt, eye_level, subsampling_level)
         else:
             ts = timestamps[i]
             raise NotImplemented("TODO")

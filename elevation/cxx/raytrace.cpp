@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
+#include "raytrace.hpp"
 
 // #define DEBUG_PRINTS 1
 
@@ -179,7 +180,7 @@ std::vector<Loc> ray_start(py::buffer_info const &buff, ssize_t i, ssize_t j,
   }
 }
 
-void raytrace(py::buffer input_buff, py::buffer output_buff, float scale,
+void raytrace_fixedsource(py::buffer input_buff, py::buffer output_buff, float scale,
               float sun_azimuth, float sun_altitude, float eye_level,
               uint subsampling_level) {
   const auto input = input_buff.request();
@@ -235,4 +236,21 @@ void raytrace(py::buffer input_buff, py::buffer output_buff, float scale,
 
         return static_cast<float>(lit_subpixels) / subpixels.size();
       });
+}
+
+void raytrace_cartographic(pybind11::buffer input, pybind11::buffer output,
+                           float scale, float bottom_latitude,
+                           float left_longitude,
+                           long long int seconds_since_epoch, float eye_level,
+                           unsigned int subsampling_level) {
+  (void)input;
+  (void)output;
+  (void)scale;
+  (void)bottom_latitude;
+  (void)left_longitude;
+  (void)seconds_since_epoch;
+  (void)eye_level;
+  (void)subsampling_level;
+
+  throw std::runtime_error("Not implemented");
 }
