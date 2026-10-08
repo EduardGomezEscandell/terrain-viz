@@ -10,8 +10,8 @@ ElevationBuffer = np.ndarray[tuple[int, int], np.dtype[ElevationFloat]]
 
 @dataclass
 class SpatialData:
-    longitude_range: tuple[float, float]
-    latitude_range: tuple[float, float]
+    northing_range: tuple[float, float]
+    easting_range: tuple[float, float]
     scale: float
     width: int
     height: int
@@ -19,7 +19,7 @@ class SpatialData:
     altered: ElevationBuffer
 
     def __str__(self) -> str:
-        return f"SpatialData(longitude_range={self.longitude_range}, latitude_range={self.latitude_range}, scale={self.scale}, width={self.width}, height={self.height})"
+        return f"SpatialData(northing_range={self.northing_range}, easting_range={self.easting_range}, scale={self.scale}, width={self.width}, height={self.height})"
 
     @staticmethod
     def __resample2D(arr: ElevationBuffer, ratio: int) -> ElevationBuffer:
@@ -81,11 +81,11 @@ def load(path: Path|str, downsampling_ratio: int) -> SpatialData:
     img = np.where(img == -9999, np.nan, img)
 
     sd = SpatialData(
-        latitude_range=(
+        northing_range=(
             float(d["Coordenada sud (metres)"]),
             float(d["Coordenada nord (metres)"]),
         ),
-        longitude_range=(
+        easting_range=(
             float(d["Coordenada oest (metres)"]),
             float(d["Coordenada est (metres)"]),
         ),

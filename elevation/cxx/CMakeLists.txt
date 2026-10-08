@@ -1,3 +1,3 @@
-pybind11_add_module(raytrace bindings.cpp raytrace.cpp)
+pybind11_add_module(raytrace bindings.cpp raytrace.cpp astronomy.cpp geography.cpp)
 target_link_libraries(raytrace PRIVATE TBB::tbb)
 install(TARGETS raytrace DESTINATION elevation)

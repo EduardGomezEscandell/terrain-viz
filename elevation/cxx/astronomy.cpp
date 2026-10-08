@@ -1,12 +1,21 @@
 #include "astronomy.hpp"
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <ctime>
+#include <numbers>
+#include <stdexcept>
 
-static constexpr float pi = M_PI;
+static constexpr float pi = std::numbers::pi;
 
 [[nodiscard]]
-auto deg2rad(auto deg) {
+constexpr auto deg2rad(auto deg) {
   return (2 * pi / 360) * deg;
+}
+
+[[nodiscard]]
+constexpr auto rad2deg(auto deg) {
+  return deg / (2 * pi / 360);
 }
 
 /**
@@ -56,8 +65,11 @@ int equation_of_time(std::tm const &utctime) {
  */
 [[nodiscard]]
 float elevation(float d, float phi, float day_angle) {
-  return std::asin(std::sin(d) * std::sin(phi) +
-                   std::cos(d) * std::cos(phi) * std::cos(day_angle));
+  const float x = std::sin(d) * std::sin(phi) +
+                  std::cos(d) * std::cos(phi) * std::cos(day_angle);
+  // Use std::clamp in case floating-point error moves x in asin(x) out side the
+  // range
+  return std::asin(std::clamp(x, -1.0f, 1.0f));
 }
 
 /**
@@ -68,23 +80,43 @@ float elevation(float d, float phi, float day_angle) {
  */
 [[nodiscard]]
 float azimuth(float d, float phi, float day_angle, float elevation) {
-  return std::acos((std::sin(d) * std::cos(phi) -
-                    std::cos(d) * std::sin(phi) * std::cos(day_angle)) /
-                   std::cos(elevation));
+  const float x = (std::sin(d) * std::cos(phi) -
+                   std::cos(d) * std::sin(phi) * std::cos(day_angle)) /
+                  std::cos(elevation);
+
+  // Use std::clamp to prevent floating point errors blowing up the computation
+  const float az = std::acos(std::clamp(x, -1.0f, 1.0f));
+
+  // acos does not know what quadrant to put the angle in
+  // We must flip its sign in the afternoon
+  if (day_angle > 0) {
+    return 2 * std::numbers::pi - az;
+  }
+  return az;
 }
 
 std::pair<float, float> sun_position(float latitude, float longitude,
                                      long seconds_since_epoch) {
-  // Use time and longitude to know how far along the year and the day we are
-  const std::tm time_utc = *std::gmtime(&seconds_since_epoch);
+  // Use time and longitude to know how far along the year and the day we
+  // are
+  const std::tm time_utc = [=]() {
+    auto *time = std::gmtime(&seconds_since_epoch);
+    if (time == nullptr) {
+      throw std::runtime_error("Could not parse seconds since epoch");
+    }
+    return *time;
+  }();
+
   const float time_correction_seconds =
       240 * longitude + equation_of_time(time_utc);
   const float day_angle = ::day_angle(time_utc, time_correction_seconds);
 
   // Compute relevant magnitudes
   const float declination = deg2rad(23.45) * std::sin(year_angle(time_utc));
-  const float elevation = ::elevation(declination, latitude, day_angle);
-  const float azimuth = ::azimuth(declination, latitude, day_angle, elevation);
+  const float elevation =
+      ::elevation(declination, deg2rad(latitude), day_angle);
+  const float azimuth =
+      ::azimuth(declination, deg2rad(latitude), day_angle, elevation);
 
-  return {elevation, azimuth};
+  return {rad2deg(elevation), rad2deg(azimuth)};
 }

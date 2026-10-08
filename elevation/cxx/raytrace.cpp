@@ -1,3 +1,7 @@
+#include "raytrace.hpp"
+#include "astronomy.hpp"
+#include "geography.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -11,9 +15,6 @@
 #include <pybind11/pytypes.h>
 #include <random>
 #include <stdexcept>
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
-#include "raytrace.hpp"
 
 // #define DEBUG_PRINTS 1
 
@@ -33,9 +34,34 @@ thread_local std::normal_distribution<float> jitter_dist(0.0, 0.05);
 
 struct spatial_data {
   py::buffer_info const &buff;
-  float max_elevation;
-  std::array<float, 3> direction;
+  float max_elevation = std::numeric_limits<float>::max();
+  float eye_level;
+
+  spatial_data(py::buffer_info const &buff, float eye_level)
+      : buff(buff), eye_level(eye_level) {
+    update_max_elevation();
+  }
+
+  void update_max_elevation() {
+    float const *const cbegin = static_cast<float const *>(buff.ptr);
+    max_elevation = *std::max_element(std::execution::par_unseq, cbegin,
+                                      cbegin + buff.size);
+  }
 };
+
+using Vec = std::array<float, 3>;
+
+[[nodiscard]]
+Vec vector_towards_the_sun(float sun_azimuth, float sun_altitude,
+                               float hscale) noexcept {
+  const auto az = sun_azimuth * std::numbers::pi_v<float> / 180;
+  const auto at = sun_altitude * std::numbers::pi_v<float> / 180;
+  return {
+      (static_cast<float>(-std::cos(at) * std::cos(az))),
+      (static_cast<float>(std::cos(at) * std::sin(az))),
+      (static_cast<float>(std::sin(at))) * hscale,
+  };
+}
 
 struct Loc {
   ssize_t i; // Pixel row
@@ -65,11 +91,11 @@ float safe_divide(float num, float denom) {
   return num / denom;
 }
 
-void advance(spatial_data const &sd, Loc &location) {
+void advance(Loc &location, Vec const &heading) {
   // Reading the direction we move we can tell what two possible edges we may
   // exit the pixel through
-  const int vx_sign = sd.direction[0] > 0 ? 1 : -1;
-  const int vy_sign = sd.direction[1] > 0 ? 1 : -1;
+  const int vx_sign = heading[0] > 0 ? 1 : -1;
+  const int vy_sign = heading[1] > 0 ? 1 : -1;
 
   const float edge_x = vx_sign * 0.5;
   const float edge_y = vy_sign * 0.5;
@@ -80,8 +106,8 @@ void advance(spatial_data const &sd, Loc &location) {
   //  - t_y is the h parameter at which the ray hits the horizontal edge of the
   //  pixel.
   // We take the minimum, as that is where the ray exits the pixel
-  const float t_x = safe_divide(edge_x - location.pos[0], sd.direction[0]);
-  const float t_y = safe_divide(edge_y - location.pos[1], sd.direction[1]);
+  const float t_x = safe_divide(edge_x - location.pos[0], heading[0]);
+  const float t_y = safe_divide(edge_y - location.pos[1], heading[1]);
 
   if (t_x < t_y) {
     // We move to the pixel to the right/left
@@ -89,16 +115,16 @@ void advance(spatial_data const &sd, Loc &location) {
 
     // Update local coordinates
     location.pos[0] = -vx_sign * 0.5;
-    location.pos[1] += sd.direction[1] * t_x;
-    location.pos[2] += sd.direction[2] * t_x;
+    location.pos[1] += heading[1] * t_x;
+    location.pos[2] += heading[2] * t_x;
   } else {
     // We move to the pixel up/down
     location.j += vy_sign;
 
     // Update local coordinates
-    location.pos[0] += sd.direction[0] * t_y;
+    location.pos[0] += heading[0] * t_y;
     location.pos[1] = -vy_sign * 0.5;
-    location.pos[2] += sd.direction[2] * t_y;
+    location.pos[2] += heading[2] * t_y;
   }
 }
 
@@ -106,13 +132,14 @@ void advance(spatial_data const &sd, Loc &location) {
  * Cast a ray starting at location. Returns true if it escapes without
  * intersecting the terrain
  */
-bool cast_single_ray(spatial_data const &sd, Loc &location) {
+bool cast_single_ray(spatial_data const &sd, Vec const &heading,
+                     Loc &location) {
   const auto [nrows, ncols] = buffer_size(sd.buff);
 
   location.print_debug();
 
   for (ssize_t i = 0; i < nrows + ncols + 1; ++i) {
-    advance(sd, location);
+    advance(location, heading);
 
     location.print_debug();
 
@@ -180,11 +207,27 @@ std::vector<Loc> ray_start(py::buffer_info const &buff, ssize_t i, ssize_t j,
   }
 }
 
-void raytrace_fixedsource(py::buffer input_buff, py::buffer output_buff, float scale,
-              float sun_azimuth, float sun_altitude, float eye_level,
-              uint subsampling_level) {
+float render_pixel(const spatial_data &sd, Vec const &heading, ssize_t row,
+                   ssize_t col, int subsampling_level) {
+  auto subpixels =
+      ray_start(sd.buff, row, col, sd.eye_level, subsampling_level);
+
+  const int lit_subpixels = std::transform_reduce(
+      std::execution::unseq, subpixels.cbegin(), subpixels.cend(), 0,
+      std::plus<int>{}, [&](Loc location) {
+        return cast_single_ray(sd, heading, location) ? 1 : 0;
+      });
+
+  return static_cast<float>(lit_subpixels) / subpixels.size();
+}
+
+// preRenderFunc = (py::buffer_info const &, py::buffer_info &) -> void;
+// renderFunc = (ssize_t, ssize_t) -> float;
+template <typename preRenderFunc, typename renderFunc>
+void iterate_canvas(py::buffer input_buff, py::buffer output_buff,
+                    preRenderFunc &&prerender, renderFunc &&render) {
   const auto input = input_buff.request();
-  const auto output = output_buff.request(true);
+  auto output = output_buff.request(true);
 
   if (input.ndim != 2) {
     throw std::runtime_error("Input buffer must have two dimension");
@@ -199,58 +242,71 @@ void raytrace_fixedsource(py::buffer input_buff, py::buffer output_buff, float s
     throw std::runtime_error("Input and output must have the same shape");
   }
 
-  const auto az = sun_azimuth * M_PI / 180;
-  const auto at = sun_altitude * M_PI / 180;
-
-  float const *const begin = static_cast<float const *>(input.ptr);
-
-  const spatial_data sd{.buff = input,
-                        .max_elevation =
-                            *std::max_element(std::execution::par_unseq, begin,
-                                              begin + input.size),
-                        .direction = {
-                            (static_cast<float>(-std::cos(at) * std::cos(az))),
-                            (static_cast<float>(std::cos(at) * std::sin(az))),
-                            (static_cast<float>(std::sin(at))) * scale,
-                        }};
-
-  debug_printf("Ray direction is (%f,%f,%f)", sd.direction[0], sd.direction[1],
-               sd.direction[2]);
+  prerender(input, output);
 
   auto out_begin = static_cast<float *>(output.ptr);
-  std::transform(
-      std::execution::par_unseq, out_begin, out_begin + input.size, out_begin,
-      [&](float &cursor) -> float {
-        debug_printf("\n------------------\n");
-        const ssize_t flat_index = &cursor - out_begin;
-        const ssize_t i = flat_index / incols;
-        const ssize_t j = flat_index % incols;
-
-        auto subpixels = ray_start(sd.buff, i, j, eye_level, subsampling_level);
-
-        const int lit_subpixels = std::transform_reduce(
-            std::execution::unseq, subpixels.cbegin(), subpixels.cend(), 0,
-            std::plus<int>{}, [&](Loc location) {
-              return cast_single_ray(sd, location) ? 1 : 0;
-            });
-
-        return static_cast<float>(lit_subpixels) / subpixels.size();
-      });
+  std::transform(std::execution::par_unseq, out_begin, out_begin + input.size,
+                 out_begin, [&](float &cursor) -> float {
+                   debug_printf("\n------------------\n");
+                   const ssize_t flat_index = &cursor - out_begin;
+                   const ssize_t i = flat_index / incols;
+                   const ssize_t j = flat_index % incols;
+                   return render(i, j);
+                 });
 }
 
-void raytrace_cartographic(pybind11::buffer input, pybind11::buffer output,
-                           float scale, float bottom_latitude,
-                           float left_longitude,
+void raytrace_fixedsource(py::buffer input_buff, py::buffer output_buff,
+                          float scale, float sun_azimuth, float sun_altitude,
+                          float eye_level, uint subsampling_level) {
+
+  std::unique_ptr<spatial_data> sd;
+  Vec heading;
+
+  const auto preRender = [=, &sd, &heading](py::buffer_info const &input,
+                                  py::buffer_info &) {
+    sd = std::make_unique<spatial_data>(input, eye_level);
+    heading = vector_towards_the_sun(sun_azimuth, sun_altitude, scale);
+
+    debug_printf("Ray direction is (%f,%f,%f)\n", heading[0], heading[1], heading[2]);
+  };
+
+  const auto render = [&sd, &heading, subsampling_level](ssize_t row, ssize_t col) {
+    return render_pixel(*sd, heading, row, col, subsampling_level);
+  };
+
+  return iterate_canvas(input_buff, output_buff, preRender, render);
+}
+
+void raytrace_cartographic(pybind11::buffer input_buff,
+                           pybind11::buffer output_buff, float scale,
+                           float bottom_northing, float left_easting,
                            long long int seconds_since_epoch, float eye_level,
                            unsigned int subsampling_level) {
-  (void)input;
-  (void)output;
-  (void)scale;
-  (void)bottom_latitude;
-  (void)left_longitude;
-  (void)seconds_since_epoch;
-  (void)eye_level;
-  (void)subsampling_level;
+  std::unique_ptr<spatial_data> sd;
 
-  throw std::runtime_error("Not implemented");
+  const auto preRender = [=, &sd](py::buffer_info const &input,
+                                  py::buffer_info &) {
+    sd = std::make_unique<spatial_data>(input, eye_level);
+  };
+
+  const auto render = [=, &sd](ssize_t row, ssize_t col) {
+    // Get latitude/longitude
+    const float N = bottom_northing + scale * (sd->buff.shape[0] - row);
+    const float E = left_easting + scale * col;
+    const auto [lat, lon] = project_EPSG25831_to_latlon(N, E);
+
+    // Get sun altitude and azimuth
+    const auto [alt, azi] = sun_position(lat, lon, seconds_since_epoch);
+    const auto heading = vector_towards_the_sun(azi, alt, scale);
+
+    if (row==0 && col == 0) {
+      debug_printf("Lat, lon: %f,%f  Az,alt: %f,%f\n", lat, lon, azi, alt);
+      debug_printf("Ray direction is (%f,%f,%f)\n", heading[0], heading[1], heading[2]);
+    }
+
+    // Render
+    return render_pixel(*sd, heading, row, col, subsampling_level);
+  };
+
+  return iterate_canvas(input_buff, output_buff, preRender, render);
 }

@@ -9,7 +9,7 @@ make dependencies
 This will download dependencies and build the binaries.
 
 ## How to use
-First, download data from https://visors.icgc.cat/appdownloads/. It myst be elevation data in TIF format.
+First, download data from https://visors.icgc.cat/appdownloads/. It must be elevation data in TIF format.
 
 Unzip the download and put it in some directory, for example `data/barcelona` and unzip it.
 
@@ -49,29 +49,54 @@ Note: there is no ray-tracing, the image is shaded based exclusively on the dire
 Here is an example with 25cm lidar data around North Barcelona lit from the north west
 ![alt text](.readme/shading.png)
 
-### Sunshine and sunset-animation
-Style `sunshine-static` uses ray tracing to render shadows for a fixed sun position. The `sun-azimuth` style argument gives the sun's direction in degrees clockwise from north, while `sun-altitude` gives its angle in degrees above the horizon.
+### Sunshine and animation
+Style `sunshine-static` renders shadows for a fixed sun position. You can define the position either by explicit solar angles, or by an ISO 8601 timestamp and the script will compute the corresponding Sun position from the data's location and time.
+
+The direct angle-based form uses:
+- `sun-azimuth`: azimuth in degrees clockwise from north
+- `sun-altitude`: elevation above the horizon in degrees
+
+The date/time form uses:
+- `datetime`: a timezone-aware ISO 8601 timestamp such as `2026-01-08T12:00:00+02:00`
+
+Style `sunshine-animation` creates a GIF by interpolating between the start and end solar conditions. Use either:
+- `datetime-start` and `datetime-end`, or
+- `sun-azimuth-start` and `sun-altitude-start` together with `sun-azimuth-end` and `sun-altitude-end`
 
 Both sunshine styles accept `subsampling-level`:
 - `0` casts one ray from each pixel center (no subsampling)
 - `1` casts four offset rays per pixel
 - `2` casts four offset rays per pixel, with each ray's position randomly jiggled. Useful to avoid sudden jumps in animations.
 
-Style `sunshine-animation` creates a GIF, each frame being the same as the sunset-static render.
-
-The `sun-azimuth-start` and `sun-altitude-start` arguments specify the starting sun position, while `sun-azimuth-end` and `sun-altitude-end` specify the ending position. `frames` sets the frame count and `duration` sets the total duration in seconds. For example:
+Example static render using a real timestamp:
 ```yaml
-style: sunset-animation
+style: sunshine-static
 style-args:
-  sun-azimuthstart: 250
-  sun-altitudestart: 60
-  sun-azimuthend: 270
-  sun-altitudeend: 0
-  frames: 96
-  duration: 4
+  datetime: 2026-01-08T12:00:00+02:00
+  subsampling-level: 2
+```
+
+Example animation using timezone-aware datetimes:
+```yaml
+style: sunshine-animation
+style-args:
+  datetime-start: 2026-01-08T12:00:00+02:00
+  datetime-end: 2026-01-08T19:00:00+02:00
+  frames: 120
+  duration: 5
   subsampling-level: 1
 ```
-Run the usual command to save the animation as `sunset.gif` in the output directory.
+
+If you prefer explicit angles instead of datetimes, this equivalent form also works:
+```yaml
+style: sunshine-static
+style-args:
+  sun-azimuth: 250
+  sun-altitude: 45
+  subsampling-level: 1
+```
+
+Run the usual command to save the output in the configured output directory.
 
 Example sunset animation over Montserrat:
 ![Sunset animation over Montserrat](.readme/montserrat.gif)

@@ -1,12 +1,10 @@
 data-directory: data/montserrat
 output-directory: out
-downsample: 16
+downsample: 4
 style: sunshine-animation
 style-args:
-  sun-azimuth-start: 180
-  sun-altitude-start: 45
-  sun-azimuth-end: 270
-  sun-altitude-end: 5
-  frames: 120
-  duration: 5
+  datetime-start: 2026-01-08T08:00:00+02:00
+  datetime-end: 2026-01-08T19:00:00+02:00
+  frames: 96
+  duration: 4
   subsampling-level: 2

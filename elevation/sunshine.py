@@ -1,5 +1,4 @@
 import datetime as dt
-import elevation.astronomy as astro
 import elevation.config as config
 import elevation.draw as draw
 import elevation.raytrace as raytrace
@@ -16,15 +15,17 @@ def __parse_subsampling_level(conf: config.Config) -> int:
     return int(value)
 
 def __parse_sun_position(conf: config.Config, suffix: str = ""):
-    has_timestamp =  f"timestamp{suffix}" in conf.style_args
+    has_datetime =  f"datetime{suffix}" in conf.style_args
     has_sun_angle = f"sun-azimuth{suffix}" in conf.style_args or f"sun-altitude{suffix}" in conf.style_args
 
-    if has_timestamp == int(has_sun_angle):
-        raise RuntimeError(f"Incompatible arguments: specify one, and only one of these two options: (a) 'timestamp{suffix}', or (b) 'sun-azimuth{suffix}' and 'sun-altitude{suffix}'")
+    if has_datetime == int(has_sun_angle):
+        raise RuntimeError(f"Incompatible arguments: specify one, and only one of these two options: (a) 'datetime{suffix}', or (b) 'sun-azimuth{suffix}' and 'sun-altitude{suffix}'")
 
-    if has_timestamp:
-        ts = conf.style_args["timestamp"]
-        return {"format": "timestamp", "timestamp": dt.datetime.fromisoformat(ts)}
+    if has_datetime:
+        datetime = conf.style_args.pop(f"datetime{suffix}")
+        if not isinstance(datetime, dt.datetime):
+            datetime = dt.datetime.fromisoformat(datetime)
+        return {"format": "timestamp", "timestamp": int(datetime.timestamp())}
 
     if has_sun_angle:
         sun_azimuth = float(conf.style_args.pop(f"sun-azimuth{suffix}", 0.0))
@@ -49,11 +50,14 @@ def draw_static(conf: config.Config, sd: data.SpatialData):
         raytrace.raytrace_fixedsource(sd.original, sd.altered, sd.scale, az, alt, eye_level, subsampling_level)
         title = f"Shadows. Azimuth: {int(sun_data["azimuth"])}°, altitude: {int(sun_data["altitude"])}°, eye level: {eye_level:.2f}"
     else:
-        raise NotImplemented("TODO")
+        timestamp: int = sun_data["timestamp"]
+        raytrace.raytrace_cartographic(sd.original, sd.altered, sd.scale, sd.northing_range[0], sd.easting_range[0], timestamp, eye_level, subsampling_level)
+        title = f"Shadows. Datetime: {dt.datetime.fromtimestamp(timestamp)}, eye level: {eye_level:.2f}"
 
     p = draw.TwoPlot(conf, sd)
     p.plot_original()
     p.plot_altered_1d(title, cmap='gray')
+    dt.UTC
     p.commit()
 
 
@@ -80,12 +84,12 @@ def draw_animation(conf: config.Config, sd: data.SpatialData):
         azimuths = np.linspace(start_sundata["azimuth"], end_sundata["azimuth"], frame_count)
         altitudes = np.linspace(start_sundata["altitude"], end_sundata["altitude"], frame_count)
     else:
-        ts_begin: dt.datetime = start_sundata["timestamp"]
-        ts_end: dt.datetime = end_sundata["timestamp"]
-        epoch = dt.datetime(1970, 1, 1, tzinfo=dt.UTC)
-        timestamps = np.linspace((ts_begin-epoch).total_seconds(), (ts_end-epoch).total_seconds(), frame_count)
+        ts_begin: int = start_sundata["timestamp"]
+        ts_end: int = end_sundata["timestamp"]
+        timestamps = np.linspace(ts_begin, ts_end, frame_count, dtype=int)
 
     print(f"Rendering...")
+    np.nan_to_num(sd.original, False, 0.0)
 
     for i in range(frame_count):
         sd.altered = np.zeros_like(sd.original)
@@ -95,8 +99,8 @@ def draw_animation(conf: config.Config, sd: data.SpatialData):
             alt = altitudes[i]
             raytrace.raytrace_fixedsource(sd.original, sd.altered, sd.scale, az, alt, eye_level, subsampling_level)
         else:
-            ts = timestamps[i]
-            raise NotImplemented("TODO")
+            timestamp = timestamps[i]
+            raytrace.raytrace_cartographic(sd.original, sd.altered, sd.scale, sd.northing_range[0], sd.easting_range[0], timestamp, eye_level, subsampling_level)
 
         gif.append(255 * sd.altered) # The data is in range 0-1, GifMaker wants 0-255
         gif.progress_bar(30)
