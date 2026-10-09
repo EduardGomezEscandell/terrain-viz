@@ -98,5 +98,13 @@ style-args:
 
 Run the usual command to save the output in the configured output directory.
 
-Example sunset animation over Montserrat:
+Example sunset animation over Montserrat, with angles chosen to make it look good.
 ![Sunset animation over Montserrat](.readme/montserrat.gif)
+
+By using actual timestamps rather than azimuth/alitude angles, you can generate real sunsets.
+
+This GIF compares 08:00-19:00 for a random day in January and one in June. See the much longer winter shadows!
+
+| January 2026 | June 2026 |
+|---|---|
+| ![](.readme/sunset-january.gif) | ![](.readme/sunset-june.gif) |
