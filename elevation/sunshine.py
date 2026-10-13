@@ -41,7 +41,7 @@ def draw_static(conf: config.Config, sd: data.SpatialData):
 
     conf.warn_if_remaining_style_args()
 
-    sd.altered = -9999*np.zeros_like(sd.original)
+    sd.altered = np.zeros_like(sd.original)
 
     title = ""
     if sun_data["format"] == "angles":
@@ -57,7 +57,6 @@ def draw_static(conf: config.Config, sd: data.SpatialData):
     p = draw.TwoPlot(conf, sd)
     p.plot_original()
     p.plot_altered_1d(title, cmap='gray')
-    dt.UTC
     p.commit()
 
 

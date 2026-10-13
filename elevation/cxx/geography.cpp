@@ -4,16 +4,32 @@
 #include <utility>
 
 // Used for intermediate calculations
+// Projection computations are quite sensitive to rounding error, so we use
+// 64-bit floats even though we both take and return 32-bit floats.
 using Float = double;
 
+/**
+ * Converts degrees to radians
+ */
+[[nodiscard]]
 constexpr Float deg2rad(const Float deg) {
   return deg * std::numbers::pi_v<Float> / 180;
 }
+
+/**
+ * Converts radians to degrees
+ */
+[[nodiscard]]
 constexpr Float rad2deg(const Float rad) {
   return rad * 180 / std::numbers::pi_v<Float>;
 }
 
-template <unsigned int z> constexpr Float fpow(const Float x) {
+/**
+ * Exponentiation unrolled at compile-time. Faster than std::pow.
+ */
+template <unsigned int z>
+[[nodiscard]]
+constexpr Float fpow(const Float x) {
   if constexpr (z == 0) {
     return 1;
   }
